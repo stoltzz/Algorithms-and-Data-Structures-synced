@@ -1,8 +1,11 @@
 package hjelpeklasser;
 
 import java.util.Arrays;
+import java.util.ConcurrentModificationException;
+import java.util.Iterator;
+import java.util.NoSuchElementException;
 
-public class BinTre<T>           // et generisk binærtre
+public class BinTre<T> implements Iterable<T>           // et generisk binærtre
 {
     private static final class Node<T>  // en indre nodeklasse
     {
@@ -21,6 +24,7 @@ public class BinTre<T>           // et generisk binærtre
 
     private Node<T> rot;      // referanse til rotnoden
     private int antall;       // antall noder i treet
+    private int endringer;      // antall endringer i treet
 
     public BinTre() { rot = null; antall = 0; }          // konstruktør
 
@@ -63,6 +67,7 @@ public class BinTre<T>           // et generisk binærtre
             q.høyre = p;                  // høyre barn til q
 
         antall++;                       // en ny verdi i treet
+        endringer++;
     }
 
 
@@ -92,11 +97,36 @@ public class BinTre<T>           // et generisk binærtre
         else q.høyre = null;
 
         antall--;  //
+        endringer++;
         return p.verdi;
     }
 
 
     public int antall() { return antall; }               // returnerer antallet
+
+    private static int antall(Node<?> p)  // ? betyr vilkårlig type
+    {
+        if (p == null) return 0;            // et tomt tre har 0 noder
+
+        return 1 + antall(p.venstre) + antall(p.høyre);
+    }
+
+    public int antall2()
+    {
+        return antall(rot);                 // kaller hjelpemetoden
+    }
+
+    private static int høyde(Node<?> p)  // ? betyr vilkårlig type
+    {
+        if (p == null) return -1;          // et tomt tre har høyde -1
+
+        return 1 + Math.max(høyde(p.venstre), høyde(p.høyre));
+    }
+
+    public int høyde()
+    {
+        return høyde(rot);                 // kaller hjelpemetoden
+    }
 
 
     public boolean tom() { return antall == 0; }         // tomt tre?
@@ -122,6 +152,34 @@ public class BinTre<T>           // et generisk binærtre
     }
 
 
+    private static <T> boolean inneholder(Node<T> p, T verdi)
+    {
+        if (p == null) return false;    // kan ikke ligge i et tomt tre
+        return verdi.equals(p.verdi) || inneholder(p.venstre,verdi)
+                || inneholder(p.høyre,verdi);
+    }
+
+    public boolean inneholder(T verdi)
+    {
+        return inneholder(rot,verdi);   // kaller den private metoden
+    }
+
+
+    private static <T> int posisjon(Node<T> p, int k, T verdi)
+    {
+        if (p == null) return -1;                  // ligger ikke i et tomt tre
+        if (verdi.equals(p.verdi)) return k;       // verdi ligger i p
+        int i = posisjon(p.venstre,2*k,verdi);     // leter i venstre subtre
+        if (i > 0) return i;                       // ligger i venstre subtre
+        return posisjon(p.høyre,2*k+1,verdi);      // leter i høyre subtre
+    }
+
+    public int posisjon(T verdi)
+    {
+        return posisjon(rot,1,verdi);  // kaller den private metoden
+    }
+
+
     public T hent(int posisjon)
     {
         Node<T> p = finnNode(posisjon);
@@ -143,6 +201,7 @@ public class BinTre<T>           // et generisk binærtre
         T gammelverdi = p.verdi;
         p.verdi = nyverdi;
 
+        endringer++;
         return gammelverdi;
     }
 
@@ -193,6 +252,7 @@ public class BinTre<T>           // et generisk binærtre
         return Arrays.copyOf(a, nivå);  // fjerner det overflødige
     }
 
+    // rekursiv preorden
     private static <T> void preorden(Node<T> p, Oppgave<? super T> oppgave)
     {
         oppgave.utførOppgave(p.verdi);                       // utfører oppgaven
@@ -201,9 +261,311 @@ public class BinTre<T>           // et generisk binærtre
         if (p.høyre != null) preorden(p.høyre,oppgave);      // til høyre barn
     }
 
+    // uten halerekursjon
+    private static <T> void preorden2(Node<T> p, Oppgave<? super T> oppgave)
+    {
+        while (true)
+        {
+            oppgave.utførOppgave(p.verdi);
+            if (p.venstre != null) preorden(p.venstre,oppgave);
+            if (p.høyre == null) return;      // metodekallet er ferdig
+            p = p.høyre;
+        }
+    }
+
     public void preorden(Oppgave<? super T> oppgave)
     {
         if (!tom()) preorden(rot,oppgave);  // sjekker om treet er tomt
     }
+
+    // iterativ preorden
+    public void preorden3(Oppgave<? super T> oppgave)   // ny versjon
+    {
+        if (tom()) return;
+
+        Stakk<Node<T>> stakk = new TabellStakk<>();
+        Node<T> p = rot;    // starter i roten
+
+        while (true)
+        {
+            oppgave.utførOppgave(p.verdi);
+
+            if (p.venstre != null)
+            {
+                if (p.høyre != null) stakk.leggInn(p.høyre);
+                p = p.venstre;
+            }
+            else if (p.høyre != null)  // her er p.venstre lik null
+            {
+                p = p.høyre;
+            }
+            else if (!stakk.tom())     // her er p en bladnode
+            {
+                p = stakk.taUt();
+            }
+            else                       // p er en bladnode og stakken er tom
+                break;                   // traverseringen er ferdig
+        }
+    }
+
+
+    // rekursiv inorden
+    private static <T> void inorden(Node<T> p, Oppgave<? super T> oppgave)
+    {
+        if (p.venstre != null) inorden(p.venstre,oppgave);
+        oppgave.utførOppgave(p.verdi);
+        if (p.høyre != null) inorden(p.høyre,oppgave);
+    }
+
+    // uten halerekursjon
+    private static <T> void inorden2(Node<T> p, Oppgave<? super T> oppgave)
+    {
+        while (true) {
+            if (p.venstre != null) inorden(p.venstre, oppgave);
+            oppgave.utførOppgave(p.verdi);
+            if (p.høyre == null) return;      // metodekallet er ferdig
+            p = p.høyre;
+        }
+    }
+
+    public void inorden(Oppgave <? super T> oppgave)
+    {
+        if (!tom()) inorden(rot,oppgave);
+    }
+
+    // iterativ inorden
+    public void inorden3(Oppgave<? super T> oppgave)  // iterativ inorden
+    {
+        if (tom()) return;            // tomt tre
+
+        Stakk<Node<T>> stakk = new TabellStakk<>();
+        Node<T> p = rot;   // starter i roten og går til venstre
+        for ( ; p.venstre != null; p = p.venstre) stakk.leggInn(p);
+
+        while (true)
+        {
+            oppgave.utførOppgave(p.verdi);      // oppgaven utføres
+
+            if (p.høyre != null)          // til venstre i høyre subtre
+            {
+                for (p = p.høyre; p.venstre != null; p = p.venstre)
+                {
+                    stakk.leggInn(p);
+                }
+            }
+            else if (!stakk.tom())
+            {
+                p = stakk.taUt();   // p.høyre == null, henter fra stakken
+            }
+            else break;          // stakken er tom - vi er ferdig
+
+        } // while
+    }
+
+    // rekursiv postorden
+    private static <T> void postorden(Node<T> p, Oppgave<? super T> oppgave)
+    {
+        if (p.venstre != null) postorden(p.venstre,oppgave);
+        if (p.høyre != null) postorden(p.høyre,oppgave);
+        oppgave.utførOppgave(p.verdi);
+    }
+
+    public void postorden(Oppgave<? super T> oppgave)
+    {
+        if (rot != null) postorden(rot,oppgave);
+    }
+
+    private static int antallBladnoder(Node<?> p) {
+
+        if (p.venstre == null && p.høyre == null) return 1;
+
+        return (p.venstre == null ? 0 : antallBladnoder(p.venstre)) +
+                (p.høyre == null ? 0 : antallBladnoder(p.høyre));
+    }
+
+    public int antallBladnoder()
+    {
+        return rot == null ? 0 : antallBladnoder(rot);
+    }
+
+    private static void makspos(Node<?> p, int pos, IntObject o) {
+        if (pos > o.get()) o.set(pos);
+        if (p.venstre != null) makspos(p.venstre, 2 * pos, o);
+        if (p.høyre != null) makspos(p.høyre, 2 * pos + 1, o);
+    }
+
+    public int makspos() {
+        IntObject o = new IntObject(-1);
+        if (!tom()) makspos(rot, 1, o);
+        return o.get();
+    }
+
+
+
+
+
+
+    // iterable Interface
+    public Iterator<T> iterator()     // skal ligge i class BinTre
+    {
+        return new InordenIterator();
+    }
+
+    private class InordenIterator implements Iterator<T>
+    {
+        private Stakk<Node<T>> stakk;   // hjelpestakk
+        private Node<T> p = null;       // hjelpevariabel
+        private int iteratorendringer;
+
+
+        // en privat hjelpemetoder skal inn her
+        private Node<T> først(Node<T> q)   // en hjelpemetode
+        {
+            while (q.venstre != null)        // starter i q
+            {
+                stakk.leggInn(q);              // legger q på stakken
+                q = q.venstre;                 // går videre mot venstre
+            }
+            return q;                        // q er lengst ned til venstre
+        }
+
+        private InordenIterator()   // konstruktør
+        {
+             if (tom()) return;               // treet er tomt
+             stakk = new TabellStakk<>();     // oppretter stakken
+             p = først(rot);                  // bruker hjelpemetoden
+            iteratorendringer = endringer;
+        }
+
+        public T next()
+        {
+            if (!hasNext()) throw new NoSuchElementException("Ingen verdier!");
+
+            if (iteratorendringer != endringer) {
+                throw new ConcurrentModificationException("Treet er endret");
+            }
+
+            T verdi = p.verdi;                        // tar vare på verdien
+
+            if (p.høyre != null) p = først(p.høyre);  // p har høyre subtre
+            else if (stakk.tom()) p = null;           // stakken er tom
+            else p = stakk.taUt();                    // tar fra stakken
+
+            return verdi;                             // returnerer verdien
+        }
+
+        public boolean hasNext()
+        {
+            return p != null;
+        }
+    }
+
+
+    // iterable Interface - OMVENDT ITERATOR
+    public Iterator<T> omvendtInordenIterator()     // skal ligge i class BinTre
+    {
+        return new OmvendtInordenIterator();
+    }
+
+    private class OmvendtInordenIterator implements Iterator<T>
+    {
+        private Stakk<Node<T>> stakk;   // hjelpestakk
+        private Node<T> p = null;       // hjelpevariabel
+
+
+        // en privat hjelpemetoder skal inn her
+        private Node<T> først(Node<T> q)   // en hjelpemetode
+        {
+            while (q.høyre != null)        // starter i q
+            {
+                stakk.leggInn(q);              // legger q på stakken
+                q = q.høyre;                 // går videre mot høyre
+            }
+            return q;                        // q er lengst ned til høyre
+        }
+
+        private OmvendtInordenIterator()   // konstruktør
+        {
+            if (tom()) return;               // treet er tomt
+            stakk = new TabellStakk<>();     // oppretter stakken
+            p = først(rot);                  // bruker hjelpemetoden
+        }
+
+        public T next()
+        {
+            if (!hasNext()) throw new NoSuchElementException("Ingen verdier!");
+
+            T verdi = p.verdi;                        // tar vare på verdien
+
+            if (p.venstre != null) p = først(p.venstre);  // p har høyre subtre
+            else if (stakk.tom()) p = null;           // stakken er tom
+            else p = stakk.taUt();                    // tar fra stakken
+
+            return verdi;                             // returnerer verdien
+        }
+
+        public boolean hasNext()
+        {
+            return p != null;
+        }
+    }
+
+
+    // iterable Interface preordenIterator
+    public Iterator<T> preordenIterator()     // skal ligge i class BinTre
+    {
+        return new PreordenIterator();
+    }
+
+    private class PreordenIterator implements Iterator<T>
+    {
+        private Stakk<Node<T>> stakk;   // hjelpestakk
+        private Node<T> p = null;       // hjelpevariabel
+
+
+        // en privat hjelpemetoder skal inn her
+        private Node<T> først(Node<T> q)   // en hjelpemetode
+        {
+            while (q.venstre != null)        // starter i q
+            {
+                stakk.leggInn(q);              // legger q på stakken
+                q = q.venstre;                 // går videre mot venstre
+            }
+            return q;                        // q er lengst ned til venstre
+        }
+
+        private PreordenIterator()   // konstruktør
+        {
+            if (tom()) return;               // treet er tomt
+            stakk = new TabellStakk<>();     // oppretter stakken
+            p = rot;
+        }
+
+        public T next()
+        {
+            if (!hasNext()) throw new NoSuchElementException("Ingen verdier!");
+
+            T verdi = p.verdi;                        // tar vare på verdien
+
+            if (p.venstre != null) {
+                if (p.høyre != null) stakk.leggInn(p.høyre);
+                p = p.venstre;
+            }
+            else if (p.høyre != null) p = p.høyre;
+            else if (stakk.tom()) p = null;           // stakken er tom
+            else p = stakk.taUt();                    // tar fra stakken
+
+            return verdi;                             // returnerer verdien
+        }
+
+        public boolean hasNext()
+        {
+            return p != null;
+        }
+    }
+
+
+
+
 
 } // class BinTre<T>

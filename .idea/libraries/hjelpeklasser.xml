@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="hjelpeklasser">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/hjelpeklasser/out/artifacts/hjelpeklasser_jar/hjelpeklasser.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>
