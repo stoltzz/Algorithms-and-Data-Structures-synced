@@ -106,21 +106,20 @@ public class SBinTre<T> // implements Beholder<T>
 
     public int antall(T verdi)
     {
-        Node<T> p = rot;                            // starter i roten
-        int count = 0;
+        Node<T> p = rot;
+        int antallVerdi = 0;
 
-        while (p != null)                           // sjekker p
+        while (p != null)
         {
-            int cmp = comp.compare(verdi, p.verdi);   // sammenligner
-            if (cmp == 0) {
-                count++;
+            int cmp = comp.compare(verdi,p.verdi);
+            if (cmp < 0) p = p.venstre;
+            else
+            {
+                if (cmp == 0) antallVerdi++;
                 p = p.høyre;
             }
-            else if (cmp < 0 && count == 0) p = p.venstre;               // går til venstre
-            else if (cmp > 0 && count == 0) p = p.høyre;            // går til høyre
-            else break;
         }
-        return count;
+        return antallVerdi;
     }
 
     public boolean tom()       // er treet tomt?
@@ -153,6 +152,8 @@ public class SBinTre<T> // implements Beholder<T>
         antall++;                                // én verdi mer i treet
         return true;                             // vellykket innlegging
     }
+
+
 
     public Liste<T> intervallsøk(T fraverdi, T tilverdi)
     {
