@@ -1,9 +1,6 @@
 package hjelpeklasser;
 
-import java.util.Arrays;
-import java.util.ConcurrentModificationException;
-import java.util.Iterator;
-import java.util.NoSuchElementException;
+import java.util.*;
 
 public class BinTre<T> implements Iterable<T>           // et generisk binærtre
 {
@@ -400,7 +397,50 @@ public class BinTre<T> implements Iterable<T>           // et generisk binærtre
         return o.get();
     }
 
+    // sjekker om treet er et mintre
+    public boolean erMintre(Comparator<? super T> c) // legges i BinTre
+    {
+        if (rot == null) return true;    // et tomt tre er et minimumstre
+        else return erMintre(rot,c);     // kaller den private hjelpemetoden
+    }
 
+    private static <T> boolean erMintre(Node<T> p, Comparator<? super T> c)
+    {
+        if (p.venstre != null)
+        {
+            if (c.compare(p.venstre.verdi,p.verdi) < 0) return false;
+            if (!erMintre(p.venstre,c)) return false;
+        }
+        if (p.høyre != null)
+        {
+            if (c.compare(p.høyre.verdi,p.verdi) < 0) return false;
+            if (!erMintre(p.høyre,c)) return false;
+        }
+        return true;
+    }
+
+    public String minimumsGrenen(Comparator<? super T> c) {
+
+        StringJoiner s = new StringJoiner(", ", "[", "]");
+
+        Node<T> p = rot;
+
+        while (p != null) {
+            s.add(p.verdi.toString());
+            if (p.venstre == null) {
+                p = p.høyre;
+            } else if (p.høyre == null) {
+                p = p.venstre;
+            } else {
+                if (c.compare(p.høyre.verdi, p.venstre.verdi) < 0) {
+                    p = p.høyre;
+                } else {
+                    p = p.venstre;
+                }
+            }
+        }
+        return s.toString();
+    }
 
 
 

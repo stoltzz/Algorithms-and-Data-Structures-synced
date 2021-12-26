@@ -1,11 +1,9 @@
 package hjelpeklasser;
 
-import java.util.Comparator;
-import java.util.NoSuchElementException;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Stream;
 
-public class SBinTre<T> // implements Beholder<T>
+public class SBinTre<T> implements Beholder<T>
 {
     private static final class Node<T> // en indre nodeklasse
     {
@@ -26,9 +24,169 @@ public class SBinTre<T> // implements Beholder<T>
 
     } // class Node
 
+    ////////////////// class InordenIterator //////////////////////////////
+
+    private class InordenIterator implements Iterator<T>
+    {
+        private Stakk<Node<T>> s = new TabellStakk<>();
+        private Node<T> p = null;
+        private int iteratorendringer;                   // iteratorendringer
+
+        private Node<T> først(Node<T> q)   // en hjelpemetode
+        {
+            while (q.venstre != null)        // starter i q
+            {
+                s.leggInn(q);                  // legger q på stakken
+                q = q.venstre;                 // går videre mot venstre
+            }
+            return q;                        // q er lengst ned til venstre
+        }
+
+        private InordenIterator()          // konstruktør
+        {
+            if (tom()) return;               // treet er tomt
+            p = først(rot);                  // bruker hjelpemetoden
+            iteratorendringer = endringer;   // setter treets endringer
+        }
+
+        public InordenIterator(T verdi)    // konstruktør
+        {
+            if (verdi == null)
+                throw new IllegalArgumentException("Treet har ikke nullverdier!");
+
+            Node<T> q = rot;
+
+            while (q != null)
+            {
+                int cmp = comp.compare(verdi, q.verdi);
+
+                if (cmp < 0)
+                {
+                    s.leggInn(q);
+                    q = q.venstre;
+                }
+                else if (cmp > 0)
+                {
+                    q = q.høyre;
+                }
+                else break;
+            }
+
+            if (q != null) p = q;
+            else if (!s.tom()) p = s.taUt();
+
+            iteratorendringer = endringer;   // setter treets endringer
+        }
+
+        @Override
+        public T next()
+        {
+            if (iteratorendringer != endringer)
+                throw new ConcurrentModificationException();
+
+            if (!hasNext()) throw new NoSuchElementException("Ingen verdier!");
+
+            T verdi = p.verdi;                        // tar vare på verdien
+
+            if (p.høyre != null) p = først(p.høyre);  // p har høyre subtre
+            else if (s.tom()) p = null;               // stakken er tom
+            else p = s.taUt();                        // tar fra stakken
+
+            return verdi;                             // returnerer verdien
+        }
+
+        @Override
+        public boolean hasNext()
+        {
+            return p != null;
+        }
+
+    } // InordenIterator
+
+    private class OmvendtInordenIterator implements Iterator<T>
+    {
+        private Stakk<Node<T>> s = new TabellStakk<>();  // for traversering
+        private Node<T> p = null;                        // nodepeker
+        private Node<T> q = null;                        // nodepeker
+        private int iteratorendringer;                   // iteratorendringer
+
+        private Node<T> sist(Node<T> q)    // en hjelpemetode
+        {
+            while (q.høyre != null)          // starter i q
+            {
+                s.leggInn(q);                  // legger q på stakken
+                q = q.høyre  ;                 // går videre mot høyre
+            }
+            return q;                        // q er lengst ned til høyre
+        }
+
+        public OmvendtInordenIterator()  // konstruktør
+        {
+            if (rot == null) return;         // treet er tomt
+            p = sist(rot);                   // bruker hjelpemetoden
+            iteratorendringer = endringer;   // setter treets endringer
+        }
+
+        public OmvendtInordenIterator(T verdi)    // konstruktør
+        {
+            if (verdi == null)
+                throw new IllegalArgumentException("Treet har ikke nullverdier!");
+
+            Node<T> q = rot;
+
+            while (q != null)
+            {
+                int cmp = comp.compare(verdi, q.verdi);
+
+                if (cmp < 0)
+                {
+                    q = q.venstre;
+                }
+                else
+                {
+                    s.leggInn(q);
+                    q = q.høyre;
+                }
+            }
+            if (!s.tom()) p = s.taUt();
+
+            iteratorendringer = endringer;   // setter treets endringer
+        }
+
+        public T next()
+        {
+            if (iteratorendringer != endringer)
+                throw new ConcurrentModificationException();
+
+            if (!hasNext()) throw new NoSuchElementException();
+
+            T verdi = p.verdi;               // tar vare på verdien i noden p
+            q = p;                           // q oppdateres før p flyttes
+
+
+            if (p.venstre != null) p = sist(p.venstre);  // p har høyre subtre
+            else if (!s.tom()) p = s.taUt();             // p har ikke høyre subtre
+            else p = null;                               // stakken er tom
+
+            return verdi;                    // returnerer verdien
+        }
+
+        public boolean hasNext()
+        {
+            return p != null;
+        }
+
+        public void remove()
+        {
+            throw new UnsupportedOperationException();
+        }
+
+    } // OmvendtInordenIterator
+
     private Node<T> rot;                       // peker til rotnoden
     private int antall;                        // antall noder
     private final Comparator<? super T> comp;  // komparator
+    private int endringer;                     // antall endringer
 
     public SBinTre(Comparator<? super T> c)    // konstruktør
     {
@@ -69,6 +227,26 @@ public class SBinTre<T> // implements Beholder<T>
     public static <T extends Comparable<? super T>> SBinTre<T> sbintre(Stream<T> s)
     {
         return sbintre(s, Comparator.naturalOrder());  // naturlig ordning
+    }
+
+    public Iterator<T> iterator()  // returnerer en iterator
+    {
+        return new InordenIterator();
+    }
+
+    public Iterator<T> iterator(T verdi)  // returnerer en iterator
+    {
+        return new InordenIterator();
+    }
+
+    public Iterator<T> riterator()
+    {
+        return new OmvendtInordenIterator();
+    }
+
+    public Iterator<T> riterator(T verdi)
+    {
+        return new OmvendtInordenIterator(verdi);
     }
 
     private static <T> Node<T> balansert(T[] a, int v, int h)  // en rekursiv metode
@@ -122,10 +300,38 @@ public class SBinTre<T> // implements Beholder<T>
         return antallVerdi;
     }
 
+    public boolean inneholder(T verdi) {
+        throw new UnsupportedOperationException();
+    }
+
     public boolean tom()       // er treet tomt?
     {
         return antall == 0;
     }
+
+
+    public void nullstill()
+    {
+        if (!tom()) nullstill(rot);  // nullstiller
+        rot = null; antall = 0;      // treet er nå tomt
+        endringer++;         // det er gjort en endring i treet
+    }
+
+    private void nullstill(Node<T> p)
+    {
+        if (p.venstre != null)
+        {
+            nullstill(p.venstre);      // venstre subtre
+            p.venstre = null;          // nuller peker
+        }
+        if (p.høyre != null)
+        {
+            nullstill(p.høyre);        // høyre subtre
+            p.høyre = null;            // nuller peker
+        }
+        p.verdi = null;              // nuller verdien
+    }
+
 
     public boolean leggInn(T verdi)    // skal ligge i class SBinTre
     {
@@ -149,11 +355,83 @@ public class SBinTre<T> // implements Beholder<T>
         else if (cmp < 0) q.venstre = p;         // venstre barn til q
         else q.høyre = p;                        // høyre barn til q
 
+        endringer++;                            // det er gjort en endring i treet
         antall++;                                // én verdi mer i treet
         return true;                             // vellykket innlegging
     }
 
+    public boolean fjern(T verdi)  // hører til klassen SBinTre
+    {
+        if (verdi == null) return false;  // treet har ingen nullverdier
 
+        Node<T> p = rot, q = null;   // q skal være forelder til p
+
+        while (p != null)            // leter etter verdi
+        {
+            int cmp = comp.compare(verdi,p.verdi);      // sammenligner
+            if (cmp < 0) { q = p; p = p.venstre; }      // går til venstre
+            else if (cmp > 0) { q = p; p = p.høyre; }   // går til høyre
+            else break;    // den søkte verdien ligger i p
+        }
+        if (p == null) return false;   // finner ikke verdi
+
+        if (p.venstre == null || p.høyre == null)  // Tilfelle 1) og 2)
+        {
+            Node<T> b = p.venstre != null ? p.venstre : p.høyre;  // b for barn
+            if (p == rot) rot = b;
+            else if (p == q.venstre) q.venstre = b;
+            else q.høyre = b;
+        }
+        else  // Tilfelle 3)
+        {
+            Node<T> s = p, r = p.høyre;   // finner neste i inorden
+            while (r.venstre != null)
+            {
+                s = r;    // s er forelder til r
+                r = r.venstre;
+            }
+
+            p.verdi = r.verdi;   // kopierer verdien i r til p
+
+            if (s != p) s.venstre = r.høyre;
+            else s.høyre = r.høyre;
+        }
+
+        endringer++;         // det er gjort en endring i treet
+        antall--;   // det er nå én node mindre i treet
+        return true;
+    }
+
+    public void fjernMin()  // hører til klassen SBinTre
+    {
+        if (tom()) throw new NoSuchElementException("Treet er tomt!");
+
+        if (rot.venstre == null) rot = rot.høyre;  // rotverdien er minst
+        else
+        {
+            Node<T> p = rot.venstre, q = rot;
+            while (p.venstre != null)
+            {
+                q = p;  // q er forelder til p
+                p = p.venstre;
+            }
+            // p er noden med minst verdi
+            q.venstre = p.høyre;
+        }
+        endringer++;         // det er gjort en endring i treet
+        antall--;  // det er nå én node mindre i treet
+    }
+
+    public int fjernAlle(T verdi) {
+
+        int antall = 0;
+
+        while (fjern(verdi)) {
+            antall++;
+        }
+
+        return antall;
+    }
 
     public Liste<T> intervallsøk(T fraverdi, T tilverdi)
     {
